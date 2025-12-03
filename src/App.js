@@ -466,6 +466,8 @@ const HeroSlideshow = ({ slides, onIndexChange, onLinkClick }) => {
 
   if (!slides || slides.length === 0) return null;
 
+  const currentSlide = slides[currentIndex];
+
   const handleSlideClick = (slide) => {
     if (slide.link) {
       if (onLinkClick) {
@@ -649,6 +651,7 @@ const ImmersiveLightbox = ({
   const highResRef = useRef(null);
   const currentImage = images[currentIndex];
 
+  // 手势状态
   const [touchStart, setTouchStart] = useState(null);
   const [touchEnd, setTouchEnd] = useState(null);
   const minSwipeDistance = 50;
@@ -684,6 +687,7 @@ const ImmersiveLightbox = ({
     if (onIndexChange) onIndexChange(nextIndex);
   };
 
+  // Touch
   const onTouchStart = (e) => {
     setTouchEnd(null);
     setTouchStart(e.targetTouches[0].clientX);
@@ -730,6 +734,7 @@ const ImmersiveLightbox = ({
         <X className="w-6 h-6" />
       </button>
 
+      {/* Fixed Arrow Navigation */}
       <div className="absolute inset-y-0 left-4 z-20 flex items-center justify-center pointer-events-none">
         <ChevronLeft className="text-white/50" size={48} />
       </div>
@@ -738,6 +743,7 @@ const ImmersiveLightbox = ({
         <ChevronRight className="text-white/50" size={48} />
       </div>
 
+      {/* Interactive Click Zones */}
       <div
         className="absolute inset-y-0 left-0 w-1/2 z-10 cursor-pointer"
         onClick={() => changeImage("prev")}
@@ -748,6 +754,7 @@ const ImmersiveLightbox = ({
       />
 
       <div className="relative z-0 w-full h-full flex items-center justify-center p-4 pointer-events-none">
+        {/* 1. Thumbnail */}
         <img
           src={placeholderSrc}
           className={`${imgClassName} object-contain absolute transition-opacity duration-700 ease-out`}
@@ -755,6 +762,7 @@ const ImmersiveLightbox = ({
           alt="placeholder"
         />
 
+        {/* 2. High Res */}
         <img
           ref={highResRef}
           src={currentImage.url}
@@ -773,6 +781,7 @@ const ImmersiveLightbox = ({
           </div>
         </div>
       </div>
+      {/* Page number */}
       <div className="absolute bottom-8 right-8 z-30 text-white/30 font-mono text-xs tracking-widest pointer-events-none">
         {currentIndex + 1} / {images.length}
       </div>
@@ -965,7 +974,7 @@ const WorksPage = ({ photos, profile, ui, onImageClick }) => {
 
 // --- 4. 后台管理组件 ---
 
-// 1. 修复：补全缺失的 HomeSettings 组件
+// [CRITICAL FIX] 补全之前遗漏的 HomeSettings 组件定义
 const HomeSettings = ({ settings, onUpdate }) => {
   const [formData, setFormData] = useState(settings.profile || {});
   const [activeLangTab, setActiveLangTab] = useState("cn");
@@ -1071,15 +1080,18 @@ const HomeSettings = ({ settings, onUpdate }) => {
           </h3>
           <div className="flex items-center gap-4">
             <span className="text-xs text-neutral-400">Show Slogan?</span>
+            {/* CSS Toggle */}
             <button
               onClick={() => handleChange("showSlogan", !formData.showSlogan)}
-              className="text-white hover:text-green-400 transition-colors"
+              className={`w-12 h-6 rounded-full p-1 transition-colors flex items-center ${
+                formData.showSlogan ? "bg-green-500" : "bg-neutral-600"
+              }`}
             >
-              {formData.showSlogan ? (
-                <ToggleRight size={32} className="text-green-500" />
-              ) : (
-                <ToggleLeft size={32} className="text-neutral-500" />
-              )}
+              <div
+                className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
+                  formData.showSlogan ? "translate-x-6" : "translate-x-0"
+                }`}
+              />
             </button>
           </div>
         </div>
@@ -1471,7 +1483,6 @@ const ProfileSettings = ({ settings, onUpdate }) => {
   );
 };
 
-// 2. AdminDashboard 布局修复：强制高度和 overflow，防止版式错位
 const AdminDashboard = ({
   photos,
   settings,
@@ -1552,7 +1563,6 @@ const AdminDashboard = ({
   );
 };
 
-// 3. MainView 修复：使用 h-[100dvh] 和 w-full 解决移动端灰色背景问题
 const MainView = ({ photos, settings, onLoginClick, isOffline }) => {
   const getInitialState = () => {
     const path = window.location.pathname;
