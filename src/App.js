@@ -241,7 +241,8 @@ const DEFAULT_PROFILE = {
     "https://images.unsplash.com/photo-1552058544-f2b08422138a?auto=format&fit=crop&w=800&q=80",
   social: { instagram: "", tiktok: "", rednote: "", twitter: "", youtube: "" },
   heroSlides: DEFAULT_SLIDES,
-  showSlogan: true,
+  showSlogan: true, // Controls the bio/text content
+  showSlideTitle: true, // Controls the big H1 slide title
   content: {
     cn: {
       title: "以光为墨，记录世界。",
@@ -466,8 +467,6 @@ const HeroSlideshow = ({ slides, onIndexChange, onLinkClick }) => {
 
   if (!slides || slides.length === 0) return null;
 
-  const currentSlide = slides[currentIndex];
-
   const handleSlideClick = (slide) => {
     if (slide.link) {
       if (onLinkClick) {
@@ -618,7 +617,7 @@ const AboutPage = ({ profile, lang, onClose }) => {
   );
 };
 
-// ImmersiveLightbox
+// ImmersiveLightbox: 优化版 (超细图标 + 手机端底部对齐)
 const ImmersiveLightbox = ({
   initialIndex,
   images,
@@ -630,7 +629,6 @@ const ImmersiveLightbox = ({
   const highResRef = useRef(null);
   const currentImage = images[currentIndex];
 
-  // 手势状态
   const [touchStart, setTouchStart] = useState(null);
   const [touchEnd, setTouchEnd] = useState(null);
   const minSwipeDistance = 50;
@@ -666,7 +664,6 @@ const ImmersiveLightbox = ({
     if (onIndexChange) onIndexChange(nextIndex);
   };
 
-  // Touch
   const onTouchStart = (e) => {
     setTouchEnd(null);
     setTouchStart(e.targetTouches[0].clientX);
@@ -706,23 +703,32 @@ const ImmersiveLightbox = ({
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
     >
+      {/* 关闭按钮 */}
       <button
         onClick={onClose}
-        className="absolute top-6 right-6 z-50 text-neutral-500 hover:text-white transition-colors p-4"
+        className="absolute top-6 right-6 z-[101] text-neutral-500 hover:text-white transition-colors p-4"
       >
         <X className="w-6 h-6" />
       </button>
 
-      {/* Fixed Arrow Navigation */}
-      <div className="absolute inset-y-0 left-4 z-20 flex items-center justify-center pointer-events-none">
-        <ChevronLeft className="text-white/50" size={48} />
+      {/* PC 端：超细半透明箭头 */}
+      <div className="hidden md:flex absolute inset-y-0 left-4 z-20 items-center justify-center pointer-events-none">
+        <ChevronLeft
+          className="text-white/50 hover:text-white transition-colors"
+          size={48}
+          strokeWidth={0.5}
+        />
       </div>
 
-      <div className="absolute inset-y-0 right-4 z-20 flex items-center justify-center pointer-events-none">
-        <ChevronRight className="text-white/50" size={48} />
+      <div className="hidden md:flex absolute inset-y-0 right-4 z-20 items-center justify-center pointer-events-none">
+        <ChevronRight
+          className="text-white/50 hover:text-white transition-colors"
+          size={48}
+          strokeWidth={0.5}
+        />
       </div>
 
-      {/* Interactive Click Zones */}
+      {/* 点击区域 */}
       <div
         className="absolute inset-y-0 left-0 w-1/2 z-10 cursor-pointer"
         onClick={() => changeImage("prev")}
@@ -733,15 +739,12 @@ const ImmersiveLightbox = ({
       />
 
       <div className="relative z-0 w-full h-full flex items-center justify-center p-4 pointer-events-none">
-        {/* 1. Thumbnail */}
         <img
           src={placeholderSrc}
           className={`${imgClassName} object-contain absolute transition-opacity duration-700 ease-out`}
           style={{ opacity: isHighResLoaded ? 0 : 1 }}
           alt="placeholder"
         />
-
-        {/* 2. High Res */}
         <img
           ref={highResRef}
           src={currentImage.url}
@@ -753,16 +756,40 @@ const ImmersiveLightbox = ({
         />
       </div>
 
-      <div className="absolute bottom-8 left-8 z-30 pointer-events-none">
-        <div className="bg-black/0 backdrop-blur-none p-4 rounded-sm">
-          <div className="text-white/40 font-serif font-thin text-xs tracking-widest mb-1">
-            {currentImage.year} — {currentImage.project}
+      {/* 底部信息栏 + 移动端翻页按钮 */}
+      <div className="absolute bottom-8 left-8 right-8 z-30 pointer-events-none flex justify-between items-end">
+        {/* 图片信息 */}
+        <div className="text-white/40 font-serif font-thin text-xs tracking-widest">
+          {currentImage.year} — {currentImage.project}
+        </div>
+
+        <div className="flex items-center gap-4 pointer-events-auto">
+          {/* 手机端翻页按钮：与页码同行，超细，半透明 */}
+          <div className="md:hidden flex items-center gap-4">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                changeImage("prev");
+              }}
+              className="text-white/50 hover:text-white p-2"
+            >
+              <ChevronLeft size={20} strokeWidth={1} />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                changeImage("next");
+              }}
+              className="text-white/50 hover:text-white p-2"
+            >
+              <ChevronRight size={20} strokeWidth={1} />
+            </button>
+          </div>
+          {/* 页码 */}
+          <div className="text-white/30 font-mono text-xs tracking-widest">
+            {currentIndex + 1} / {images.length}
           </div>
         </div>
-      </div>
-      {/* Page number */}
-      <div className="absolute bottom-8 right-8 z-30 text-white/30 font-mono text-xs tracking-widest pointer-events-none">
-        {currentIndex + 1} / {images.length}
       </div>
     </div>
   );
@@ -953,7 +980,6 @@ const WorksPage = ({ photos, profile, ui, onImageClick }) => {
 
 // --- 4. 后台管理组件 ---
 
-// [CRITICAL FIX] 重新插入被遗漏的 PhotosManager 组件
 const PhotosManager = ({
   photos,
   onAddPhoto,
@@ -1386,20 +1412,40 @@ const HomeSettings = ({ settings, onUpdate }) => {
             <Type className="w-5 h-5" /> Slogan Settings
           </h3>
           <div className="flex items-center gap-4">
-            <span className="text-xs text-neutral-400">Show Slogan?</span>
-            {/* CSS Toggle */}
-            <button
-              onClick={() => handleChange("showSlogan", !formData.showSlogan)}
-              className={`w-12 h-6 rounded-full p-1 transition-colors flex items-center ${
-                formData.showSlogan ? "bg-green-500" : "bg-neutral-600"
-              }`}
-            >
-              <div
-                className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
-                  formData.showSlogan ? "translate-x-6" : "translate-x-0"
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-neutral-400">Show Slogan?</span>
+              <button
+                onClick={() => handleChange("showSlogan", !formData.showSlogan)}
+                className={`w-12 h-6 rounded-full p-1 transition-colors flex items-center ${
+                  formData.showSlogan ? "bg-green-500" : "bg-neutral-600"
                 }`}
-              />
-            </button>
+              >
+                <div
+                  className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
+                    formData.showSlogan ? "translate-x-6" : "translate-x-0"
+                  }`}
+                />
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-neutral-400">
+                Show Slide Title?
+              </span>
+              <button
+                onClick={() =>
+                  handleChange("showSlideTitle", !formData.showSlideTitle)
+                }
+                className={`w-12 h-6 rounded-full p-1 transition-colors flex items-center ${
+                  formData.showSlideTitle ? "bg-green-500" : "bg-neutral-600"
+                }`}
+              >
+                <div
+                  className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
+                    formData.showSlideTitle ? "translate-x-6" : "translate-x-0"
+                  }`}
+                />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1790,7 +1836,6 @@ const ProfileSettings = ({ settings, onUpdate }) => {
   );
 };
 
-// 2. AdminDashboard 布局修复：强制高度和 overflow，防止版式错位
 const AdminDashboard = ({
   photos,
   settings,
@@ -1871,7 +1916,6 @@ const AdminDashboard = ({
   );
 };
 
-// 3. MainView 修复：使用 h-[100dvh] 和 w-full 解决移动端灰色背景问题
 const MainView = ({ photos, settings, onLoginClick, isOffline }) => {
   const getInitialState = () => {
     const path = window.location.pathname;
@@ -2060,6 +2104,7 @@ const MainView = ({ photos, settings, onLoginClick, isOffline }) => {
       />
       {view === "home" && !showAbout && (
         <div className="relative h-[100dvh] w-full overflow-hidden">
+          {/* Slogan Section (Content) */}
           {profile.showSlogan && (
             <div className="absolute inset-0 pointer-events-none z-10">
               {slides.map((slide, index) => {
@@ -2076,11 +2121,14 @@ const MainView = ({ photos, settings, onLoginClick, isOffline }) => {
                     <h2 className="text-white/70 tracking-[0.4em] mb-6 uppercase text-[10px] font-bold font-serif">
                       {content.title}
                     </h2>
-                    <div className="overflow-hidden min-h-[3rem] md:min-h-[5rem]">
-                      <h1 className="text-3xl sm:text-4xl md:text-6xl font-thin mb-6 text-white tracking-wide leading-none opacity-95 font-serif">
-                        {slide.title || profile.brandName}
-                      </h1>
-                    </div>
+                    {/* Slide Title (Conditional) */}
+                    {profile.showSlideTitle && (
+                      <div className="overflow-hidden min-h-[3rem] md:min-h-[5rem]">
+                        <h1 className="text-3xl sm:text-4xl md:text-6xl font-thin mb-6 text-white tracking-wide leading-none opacity-95 font-serif">
+                          {slide.title || profile.brandName}
+                        </h1>
+                      </div>
+                    )}
                     <p className="text-neutral-400 text-xs sm:text-sm font-light max-w-lg leading-relaxed border-l border-white/10 pl-4 opacity-80 font-sans">
                       {content.bio}
                     </p>
