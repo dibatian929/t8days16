@@ -41,8 +41,6 @@ import {
   Maximize,
   Aperture,
   Home,
-  ToggleLeft,
-  ToggleRight,
 } from "lucide-react";
 import { initializeApp } from "firebase/app";
 import {
@@ -466,8 +464,6 @@ const HeroSlideshow = ({ slides, onIndexChange, onLinkClick }) => {
   }, [currentIndex, onIndexChange]);
 
   if (!slides || slides.length === 0) return null;
-
-  const currentSlide = slides[currentIndex];
 
   const handleSlideClick = (slide) => {
     if (slide.link) {
@@ -979,7 +975,7 @@ const WorksPage = ({ photos, profile, ui, onImageClick }) => {
 
 // --- 4. 后台管理组件 ---
 
-// [Fixed] PhotosManager 组件已找回
+// [CRITICAL FIX] 重新插入 PhotosManager 组件 (修复 PhotosManager is not defined 错误)
 const PhotosManager = ({
   photos,
   onAddPhoto,
@@ -1413,6 +1409,7 @@ const HomeSettings = ({ settings, onUpdate }) => {
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <span className="text-xs text-neutral-400">Show Slogan?</span>
+              {/* Pure CSS Toggle */}
               <button
                 onClick={() => handleChange("showSlogan", !formData.showSlogan)}
                 className={`w-12 h-6 rounded-full p-1 transition-colors flex items-center ${
