@@ -517,27 +517,6 @@ const HeroSlideshow = ({ slides, onIndexChange, onLinkClick }) => {
           </div>
         );
       })}
-
-      {/* 简约圆点指示器 */}
-      {slides.length > 1 && (
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex items-center justify-center gap-3">
-          {slides.map((_, idx) => (
-            <button
-              key={idx}
-              onClick={(e) => {
-                e.stopPropagation();
-                setCurrentIndex(idx);
-              }}
-              className={`w-2 h-2 rounded-full cursor-pointer transition-all duration-300 ${
-                idx === currentIndex
-                  ? "bg-white scale-125"
-                  : "bg-white/40 hover:bg-white/60"
-              }`}
-              aria-label={`Go to slide ${idx + 1}`}
-            />
-          ))}
-        </div>
-      )}
     </div>
   );
 };
@@ -639,7 +618,7 @@ const AboutPage = ({ profile, lang, onClose }) => {
   );
 };
 
-// ImmersiveLightbox: 优化版
+// ImmersiveLightbox
 const ImmersiveLightbox = ({
   initialIndex,
   images,
@@ -974,7 +953,335 @@ const WorksPage = ({ photos, profile, ui, onImageClick }) => {
 
 // --- 4. 后台管理组件 ---
 
-// [NEW] 补全缺失的 HomeSettings 组件 (修复白屏的关键)
+// [CRITICAL FIX] 重新插入被遗漏的 PhotosManager 组件
+const PhotosManager = ({
+  photos,
+  onAddPhoto,
+  onDeletePhoto,
+  onBatchUpdate,
+}) => {
+  const [uploading, setUploading] = useState(false);
+  const [files, setFiles] = useState([]);
+  const [uploadYear, setUploadYear] = useState(
+    new Date().getFullYear().toString()
+  );
+  const [uploadProject, setUploadProject] = useState("");
+  const [localPhotos, setLocalPhotos] = useState(photos);
+  const [dragged, setDragged] = useState(null);
+
+  useEffect(() => {
+    setLocalPhotos(photos);
+  }, [photos]);
+
+  const grouped = localPhotos.reduce((acc, p) => {
+    const y = p.year ? String(p.year).trim() : "Unsorted";
+    const proj = p.project ? String(p.project).trim() : "Uncategorized";
+    if (!acc[y]) acc[y] = {};
+    if (!acc[y][proj]) acc[y][proj] = [];
+    acc[y][proj].push(p);
+    return acc;
+  }, {});
+
+  const getSortedProjects = (year) => {
+    const projs = Object.keys(grouped[year]);
+    return projs.sort((a, b) => {
+      const minA = Math.min(...grouped[year][a].map((p) => p.order || 0));
+      const minB = Math.min(...grouped[year][b].map((p) => p.order || 0));
+      return minA - minB;
+    });
+  };
+
+  const handleBatchUpload = async () => {
+    if (files.length === 0) return;
+    if (!uploadProject.trim()) return alert("Please enter a Project Name.");
+    setUploading(true);
+    try {
+      const promises = Array.from(files).map(async (file, idx) => {
+        const timestamp = Date.now();
+        const thumbFile = await compressImage(file, 400, 0.6);
+        let thumbUrl = "";
+        if (thumbFile)
+          thumbUrl = await uploadFileToStorage(
+            thumbFile,
+            `photos/${uploadYear}/${uploadProject.trim()}/${timestamp}_${idx}_thumb.jpg`
+          );
+
+        const optimizedFile = await compressImage(file, 1920, 0.85);
+        const url = await uploadFileToStorage(
+          optimizedFile || file,
+          `photos/${uploadYear}/${uploadProject.trim()}/${timestamp}_${idx}`
+        );
+
+        return onAddPhoto({
+          title: file.name.split(".")[0],
+          year: uploadYear.trim(),
+          project: uploadProject.trim(),
+          url,
+          thumbnailUrl: thumbUrl,
+          order: 9999,
+          isVisible: true,
+        });
+      });
+      await Promise.all(promises);
+      setFiles([]);
+      alert("Uploaded!");
+    } catch (e) {
+      alert(e.message);
+    }
+    setUploading(false);
+  };
+
+  const handleProjectUpload = async (e, year, project) => {
+    const fs = e.target.files;
+    if (!fs.length) return;
+    setUploading(true);
+    try {
+      const promises = Array.from(fs).map(async (file, idx) => {
+        const ts = Date.now();
+        const thumb = await compressImage(file, 400, 0.6);
+        let tUrl = "";
+        if (thumb)
+          tUrl = await uploadFileToStorage(
+            thumb,
+            `photos/${year}/${project}/${ts}_${idx}_thumb.jpg`
+          );
+
+        const optimizedFile = await compressImage(file, 1920, 0.85);
+        const url = await uploadFileToStorage(
+          optimizedFile || file,
+          `photos/${year}/${project}/${ts}_${idx}`
+        );
+        return onAddPhoto({
+          title: file.name.split(".")[0],
+          year,
+          project,
+          url,
+          thumbnailUrl: tUrl,
+          order: 9999,
+          isVisible: true,
+        });
+      });
+      await Promise.all(promises);
+      alert("Added!");
+    } catch (e) {
+      alert(e.message);
+    }
+    setUploading(false);
+  };
+
+  const handleDeleteProject = async (project, year) => {
+    const toDelete = photos.filter(
+      (p) =>
+        (p.year === year || (!p.year && year === "Unsorted")) &&
+        p.project === project
+    );
+    if (confirm(`Delete project "${project}" (${toDelete.length} photos)?`)) {
+      setUploading(true);
+      await Promise.all(toDelete.map((p) => onDeletePhoto(p.id)));
+      setUploading(false);
+    }
+  };
+
+  const handleRenameProject = async (oldName, year) => {
+    const newName = prompt("Rename to:", oldName);
+    if (newName && newName !== oldName) {
+      const toUpdate = photos.filter(
+        (p) =>
+          (p.year === year || (!p.year && year === "Unsorted")) &&
+          p.project === oldName
+      );
+      onBatchUpdate(toUpdate.map((p) => ({ id: p.id, project: newName })));
+    }
+  };
+
+  const moveProject = (year, proj, dir) => {
+    const projs = getSortedProjects(year);
+    const idx = projs.indexOf(proj);
+    if (idx === -1) return;
+    const newIdx = dir === "up" ? idx - 1 : idx + 1;
+    if (newIdx < 0 || newIdx >= projs.length) return;
+
+    const newOrderProjs = [...projs];
+    [newOrderProjs[idx], newOrderProjs[newIdx]] = [
+      newOrderProjs[newIdx],
+      newOrderProjs[idx],
+    ];
+
+    let counter = 1;
+    const newLocal = [...localPhotos];
+    const otherYearPhotos = newLocal.filter((p) => p.year !== year);
+    const thisYearPhotos = [];
+
+    newOrderProjs.forEach((pName) => {
+      const pPhotos = grouped[year][pName];
+      pPhotos.sort((a, b) => (a.order || 0) - (b.order || 0));
+      pPhotos.forEach((p) => {
+        thisYearPhotos.push({ ...p, order: counter++ });
+      });
+    });
+
+    setLocalPhotos([...otherYearPhotos, ...thisYearPhotos]);
+  };
+
+  const handleSaveOrder = () => {
+    onBatchUpdate(localPhotos.map((p, i) => ({ id: p.id, order: i + 1 })));
+    alert("Order Saved");
+  };
+
+  const onDragStart = (e, p) => setDragged(p);
+  const onDragEnter = (e, target) => {
+    e.preventDefault();
+    if (!dragged || dragged.id === target.id) return;
+    if (dragged.project !== target.project || dragged.year !== target.year)
+      return;
+
+    const items = [...localPhotos];
+    const f = items.findIndex((i) => i.id === dragged.id);
+    const t = items.findIndex((i) => i.id === target.id);
+
+    if (f < 0 || t < 0) return;
+    const item = items.splice(f, 1)[0];
+    items.splice(t, 0, item);
+    setLocalPhotos(items);
+  };
+
+  return (
+    <div className="space-y-12">
+      <div className="bg-neutral-900 border border-neutral-800 p-6 rounded-xl sticky top-0 z-20 shadow-xl">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <input
+            className="bg-black border border-neutral-700 p-2 text-white rounded"
+            value={uploadYear}
+            onChange={(e) => setUploadYear(e.target.value)}
+            placeholder="Year"
+          />
+          <input
+            className="bg-black border border-neutral-700 p-2 text-white rounded"
+            value={uploadProject}
+            onChange={(e) => setUploadProject(e.target.value)}
+            placeholder="Project Name"
+          />
+          <div className="relative border border-dashed border-neutral-600 bg-black rounded flex items-center justify-center cursor-pointer hover:border-white">
+            <span className="text-xs text-neutral-400">
+              {files.length ? `${files.length} files` : "Select Photos"}
+            </span>
+            <input
+              type="file"
+              multiple
+              className="absolute inset-0 opacity-0"
+              onChange={(e) => setFiles(e.target.files)}
+            />
+          </div>
+        </div>
+        <button
+          onClick={handleBatchUpload}
+          disabled={uploading}
+          className="w-full mt-4 bg-white text-black font-bold py-2 rounded hover:bg-neutral-200"
+        >
+          {uploading ? "Uploading..." : "Upload"}
+        </button>
+      </div>
+
+      <div className="space-y-8 pb-24">
+        <div className="flex justify-end">
+          <button
+            onClick={handleSaveOrder}
+            className="bg-white text-black px-4 py-2 rounded font-bold text-sm"
+          >
+            Save Order
+          </button>
+        </div>
+        {Object.keys(grouped)
+          .sort((a, b) => b - a)
+          .map((year) => (
+            <div key={year}>
+              <h4 className="text-neutral-500 font-serif text-2xl border-b border-neutral-800 pb-2 mb-4">
+                {year}
+              </h4>
+              {getSortedProjects(year).map((proj) => (
+                <div
+                  key={proj}
+                  className="bg-neutral-900/30 p-4 rounded-xl border border-neutral-800 mb-6"
+                >
+                  <div className="flex justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-white font-bold">{proj}</span>
+                      <button
+                        onClick={() => handleRenameProject(proj, year)}
+                        className="text-neutral-500 hover:text-white"
+                      >
+                        <Edit size={14} />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteProject(proj, year)}
+                        className="text-red-500 hover:text-red-400"
+                      >
+                        <Trash size={14} />
+                      </button>
+                    </div>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => moveProject(year, proj, "up")}
+                        className="p-1 bg-neutral-800 rounded"
+                      >
+                        <ArrowUp size={14} />
+                      </button>
+                      <button
+                        onClick={() => moveProject(year, proj, "down")}
+                        className="p-1 bg-neutral-800 rounded"
+                      >
+                        <ArrowDown size={14} />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
+                    {grouped[year][proj].map((p) => (
+                      <div
+                        key={p.id}
+                        draggable
+                        onDragStart={(e) => onDragStart(e, p)}
+                        onDragEnter={(e) => onDragEnter(e, p)}
+                        onDragOver={(e) => e.preventDefault()}
+                        className={`aspect-square bg-black rounded relative group cursor-move ${
+                          dragged?.id === p.id ? "opacity-50" : "opacity-100"
+                        }`}
+                      >
+                        <img
+                          src={p.thumbnailUrl || p.url}
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute top-1 left-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10 text-neutral-400 pointer-events-none">
+                          <Menu size={14} />
+                        </div>
+                        <button
+                          onClick={() => {
+                            if (confirm("Delete?")) onDeletePhoto(p.id);
+                          }}
+                          className="absolute top-0 right-0 bg-red-500 text-white p-1 opacity-0 group-hover:opacity-100 z-10"
+                        >
+                          <Trash size={10} />
+                        </button>
+                      </div>
+                    ))}
+                    <div className="aspect-square border border-dashed border-neutral-700 flex items-center justify-center relative cursor-pointer hover:border-white">
+                      <Plus className="text-neutral-500" />
+                      <input
+                        type="file"
+                        multiple
+                        className="absolute inset-0 opacity-0"
+                        onChange={(e) => handleProjectUpload(e, year, proj)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+      </div>
+    </div>
+  );
+};
+
 const HomeSettings = ({ settings, onUpdate }) => {
   const [formData, setFormData] = useState(settings.profile || {});
   const [activeLangTab, setActiveLangTab] = useState("cn");
