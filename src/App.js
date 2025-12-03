@@ -639,7 +639,7 @@ const AboutPage = ({ profile, lang, onClose }) => {
   );
 };
 
-// ImmersiveLightbox
+// ImmersiveLightbox: 优化版
 const ImmersiveLightbox = ({
   initialIndex,
   images,
@@ -974,7 +974,7 @@ const WorksPage = ({ photos, profile, ui, onImageClick }) => {
 
 // --- 4. 后台管理组件 ---
 
-// [CRITICAL FIX] 补全之前遗漏的 HomeSettings 组件定义
+// [NEW] 补全缺失的 HomeSettings 组件 (修复白屏的关键)
 const HomeSettings = ({ settings, onUpdate }) => {
   const [formData, setFormData] = useState(settings.profile || {});
   const [activeLangTab, setActiveLangTab] = useState("cn");
@@ -1483,6 +1483,7 @@ const ProfileSettings = ({ settings, onUpdate }) => {
   );
 };
 
+// 2. AdminDashboard 布局修复：强制高度和 overflow，防止版式错位
 const AdminDashboard = ({
   photos,
   settings,
@@ -1563,6 +1564,7 @@ const AdminDashboard = ({
   );
 };
 
+// 3. MainView 修复：使用 h-[100dvh] 和 w-full 解决移动端灰色背景问题
 const MainView = ({ photos, settings, onLoginClick, isOffline }) => {
   const getInitialState = () => {
     const path = window.location.pathname;
