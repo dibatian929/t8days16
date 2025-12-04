@@ -241,8 +241,8 @@ const DEFAULT_PROFILE = {
     "https://images.unsplash.com/photo-1552058544-f2b08422138a?auto=format&fit=crop&w=800&q=80",
   social: { instagram: "", tiktok: "", rednote: "", twitter: "", youtube: "" },
   heroSlides: DEFAULT_SLIDES,
-  showSlogan: true, // Controls the bio/text content
-  showSlideTitle: true, // Controls the big H1 slide title
+  showSlogan: true,
+  showSlideTitle: true,
   content: {
     cn: {
       title: "以光为墨，记录世界。",
@@ -617,7 +617,7 @@ const AboutPage = ({ profile, lang, onClose }) => {
   );
 };
 
-// ImmersiveLightbox: 优化版 (超细图标 + 手机端底部对齐)
+// ImmersiveLightbox: 优化版 (解决手机卡顿问题 + 逃生关闭)
 const ImmersiveLightbox = ({
   initialIndex,
   images,
@@ -690,6 +690,13 @@ const ImmersiveLightbox = ({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [currentIndex]);
 
+  // 点击背景关闭
+  const handleBackgroundClick = (e) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
   if (!currentImage) return null;
 
   const isHighRes = currentImage.width > 1920 && currentImage.height > 1080;
@@ -702,8 +709,9 @@ const ImmersiveLightbox = ({
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
+      onClick={handleBackgroundClick} // 背景点击关闭
+      style={{ touchAction: "none" }} // 禁止浏览器滚动，优化手机体验
     >
-      {/* 关闭按钮 */}
       <button
         onClick={onClose}
         className="absolute top-6 right-6 z-[101] text-neutral-500 hover:text-white transition-colors p-4"
@@ -728,14 +736,20 @@ const ImmersiveLightbox = ({
         />
       </div>
 
-      {/* 点击区域 */}
+      {/* Interactive Click Zones */}
       <div
         className="absolute inset-y-0 left-0 w-1/2 z-10 cursor-pointer"
-        onClick={() => changeImage("prev")}
+        onClick={(e) => {
+          e.stopPropagation();
+          changeImage("prev");
+        }}
       />
       <div
         className="absolute inset-y-0 right-0 w-1/2 z-10 cursor-pointer"
-        onClick={() => changeImage("next")}
+        onClick={(e) => {
+          e.stopPropagation();
+          changeImage("next");
+        }}
       />
 
       <div className="relative z-0 w-full h-full flex items-center justify-center p-4 pointer-events-none">
@@ -756,15 +770,14 @@ const ImmersiveLightbox = ({
         />
       </div>
 
-      {/* 底部信息栏 + 移动端翻页按钮 */}
+      {/* 底部信息栏 */}
       <div className="absolute bottom-8 left-8 right-8 z-30 pointer-events-none flex justify-between items-end">
-        {/* 图片信息 */}
         <div className="text-white/40 font-serif font-thin text-xs tracking-widest">
           {currentImage.year} — {currentImage.project}
         </div>
 
         <div className="flex items-center gap-4 pointer-events-auto">
-          {/* 手机端翻页按钮：与页码同行，超细，半透明 */}
+          {/* 手机端翻页按钮 */}
           <div className="md:hidden flex items-center gap-4">
             <button
               onClick={(e) => {
@@ -785,7 +798,6 @@ const ImmersiveLightbox = ({
               <ChevronRight size={20} strokeWidth={1} />
             </button>
           </div>
-          {/* 页码 */}
           <div className="text-white/30 font-mono text-xs tracking-widest">
             {currentIndex + 1} / {images.length}
           </div>
@@ -1414,6 +1426,7 @@ const HomeSettings = ({ settings, onUpdate }) => {
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <span className="text-xs text-neutral-400">Show Slogan?</span>
+              {/* CSS Toggle */}
               <button
                 onClick={() => handleChange("showSlogan", !formData.showSlogan)}
                 className={`w-12 h-6 rounded-full p-1 transition-colors flex items-center ${
@@ -2104,8 +2117,8 @@ const MainView = ({ photos, settings, onLoginClick, isOffline }) => {
       />
       {view === "home" && !showAbout && (
         <div className="relative h-[100dvh] w-full overflow-hidden">
-          {/* Slogan Section (Content) */}
-          {profile.showSlogan && (
+          {/* Slogan & Title Overlay */}
+          {(profile.showSlogan || profile.showSlideTitle) && (
             <div className="absolute inset-0 pointer-events-none z-10">
               {slides.map((slide, index) => {
                 const isActive = index === currentSlideIndex;
@@ -2118,10 +2131,12 @@ const MainView = ({ photos, settings, onLoginClick, isOffline }) => {
                         : "opacity-0 translate-y-4"
                     }`}
                   >
-                    <h2 className="text-white/70 tracking-[0.4em] mb-6 uppercase text-[10px] font-bold font-serif">
-                      {content.title}
-                    </h2>
-                    {/* Slide Title (Conditional) */}
+                    {profile.showSlogan && (
+                      <h2 className="text-white/70 tracking-[0.4em] mb-6 uppercase text-[10px] font-bold font-serif">
+                        {content.title}
+                      </h2>
+                    )}
+
                     {profile.showSlideTitle && (
                       <div className="overflow-hidden min-h-[3rem] md:min-h-[5rem]">
                         <h1 className="text-3xl sm:text-4xl md:text-6xl font-thin mb-6 text-white tracking-wide leading-none opacity-95 font-serif">
@@ -2129,9 +2144,12 @@ const MainView = ({ photos, settings, onLoginClick, isOffline }) => {
                         </h1>
                       </div>
                     )}
-                    <p className="text-neutral-400 text-xs sm:text-sm font-light max-w-lg leading-relaxed border-l border-white/10 pl-4 opacity-80 font-sans">
-                      {content.bio}
-                    </p>
+
+                    {profile.showSlogan && (
+                      <p className="text-neutral-400 text-xs sm:text-sm font-light max-w-lg leading-relaxed border-l border-white/10 pl-4 opacity-80 font-sans">
+                        {content.bio}
+                      </p>
+                    )}
                   </div>
                 );
               })}
@@ -2252,7 +2270,14 @@ const AppContent = () => {
       getPublicCollection("photos"),
       (snap) => {
         const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        data.sort((a, b) => (a.order || 9999) - (b.order || 9999));
+
+        // [Critical Fix] 统一排序逻辑，修复前端排序滞后问题
+        data.sort((a, b) => {
+          const orderA = typeof a.order === "number" ? a.order : 9999;
+          const orderB = typeof b.order === "number" ? b.order : 9999;
+          return orderA - orderB;
+        });
+
         setPhotos(data);
         setIsLoading(false);
       },
