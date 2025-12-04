@@ -314,6 +314,77 @@ const LoginModal = ({ isOpen, onClose, onLogin }) => {
   );
 };
 
+// [NEW] 项目信息编辑弹窗
+const ProjectEditModal = ({ isOpen, onClose, initialData, onSave }) => {
+  const [formData, setFormData] = useState({ en: "", cn: "", th: "" });
+
+  useEffect(() => {
+    if (initialData) {
+      setFormData({
+        en: initialData.en || "",
+        cn: initialData.cn || "",
+        th: initialData.th || "",
+      });
+    }
+  }, [initialData]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6 w-full max-w-md shadow-2xl animate-fade-in-up">
+        <h3 className="text-white text-lg font-bold mb-4">Edit Project Info</h3>
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs text-neutral-500 uppercase mb-1 block">
+              Project ID / English Name (EN)
+            </label>
+            <input
+              className="w-full bg-black border border-neutral-700 rounded p-2 text-white text-sm"
+              value={formData.en}
+              onChange={(e) => setFormData({ ...formData, en: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="text-xs text-neutral-500 uppercase mb-1 block">
+              Chinese Name (CN)
+            </label>
+            <input
+              className="w-full bg-black border border-neutral-700 rounded p-2 text-white text-sm"
+              value={formData.cn}
+              onChange={(e) => setFormData({ ...formData, cn: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="text-xs text-neutral-500 uppercase mb-1 block">
+              Thai Name (TH)
+            </label>
+            <input
+              className="w-full bg-black border border-neutral-700 rounded p-2 text-white text-sm"
+              value={formData.th}
+              onChange={(e) => setFormData({ ...formData, th: e.target.value })}
+            />
+          </div>
+        </div>
+        <div className="flex gap-3 mt-6">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2 text-neutral-400 hover:text-white text-sm"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => onSave(formData)}
+            className="flex-1 py-2 bg-white text-black font-bold rounded hover:bg-neutral-200 text-sm"
+          >
+            Save Changes
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const GlobalNav = ({
   profile,
   ui,
@@ -617,7 +688,7 @@ const AboutPage = ({ profile, lang, onClose }) => {
   );
 };
 
-// ImmersiveLightbox: 优化版 (接收 lang 参数并显示多语言标题)
+// ImmersiveLightbox: 优化版 (解决手机卡顿 + 多语言标题)
 const ImmersiveLightbox = ({
   initialIndex,
   images,
@@ -630,7 +701,6 @@ const ImmersiveLightbox = ({
   const highResRef = useRef(null);
   const currentImage = images[currentIndex];
 
-  // 手势状态
   const [touchStart, setTouchStart] = useState(null);
   const [touchEnd, setTouchEnd] = useState(null);
   const minSwipeDistance = 50;
@@ -692,6 +762,7 @@ const ImmersiveLightbox = ({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [currentIndex]);
 
+  // 点击背景关闭
   const handleBackgroundClick = (e) => {
     if (e.target === e.currentTarget) {
       onClose();
@@ -704,7 +775,7 @@ const ImmersiveLightbox = ({
   const imgClassName = isHighRes ? "h-[75vh] w-auto" : "max-h-[75vh] w-auto";
   const placeholderSrc = currentImage.thumbnailUrl || currentImage.url;
 
-  // Multi-language Title Resolution
+  // Resolve Multi-language Title
   const displayTitle =
     currentImage.projectTitles?.[lang] || currentImage.project;
 
@@ -954,20 +1025,20 @@ const WorksPage = ({ photos, profile, ui, onImageClick, lang }) => {
             key={year}
             className="mb-16 md:mb-12 flex flex-col md:flex-row gap-4 md:gap-8"
           >
-            <div className="md:w-48 flex-shrink-0 relative md:sticky md:top-32 h-fit pointer-events-none z-10">
+            {/* CRITICAL FIX: 彻底移除了 sticky 效果，现在年份在所有设备上都会随页面滚动 */}
+            <div className="md:w-48 flex-shrink-0 relative h-fit pointer-events-none z-10">
               <span className="text-4xl md:text-2xl font-serif font-thin text-white/30 md:text-white/50 tracking-widest block leading-none md:-ml-2 transition-all font-serif">
                 {year}
               </span>
             </div>
             <div className="flex-grow flex flex-col gap-8 overflow-hidden mt-4 md:mt-0">
               {getSortedProjects(year).map((projectKey) => {
-                // 核心逻辑：找到该项目组的第一个图片，读取其 projectTitles
                 const projectPhotos = groupedByYearAndProject[year][
                   projectKey
                 ].sort((a, b) => (a.order || 0) - (b.order || 0));
                 const firstPhoto = projectPhotos[0];
                 const displayTitle =
-                  firstPhoto.projectTitles?.[lang] || projectKey; // 默认显示英文(key)
+                  firstPhoto.projectTitles?.[lang] || projectKey;
 
                 return (
                   <ProjectRow
@@ -1010,12 +1081,15 @@ const PhotosManager = ({
     new Date().getFullYear().toString()
   );
 
-  // State for Multi-language Project Names
+  // Multi-language Inputs
   const [uploadProjectEn, setUploadProjectEn] = useState("");
   const [uploadProjectCn, setUploadProjectCn] = useState("");
   const [uploadProjectTh, setUploadProjectTh] = useState("");
 
   const [localPhotos, setLocalPhotos] = useState(photos);
+  const [dragged, setDragged] = useState(null);
+  // State for Edit Modal
+  const [editingProjectData, setEditingProjectData] = useState(null);
 
   useEffect(() => {
     setLocalPhotos(photos);
@@ -1064,7 +1138,7 @@ const PhotosManager = ({
         return onAddPhoto({
           title: file.name.split(".")[0],
           year: uploadYear.trim(),
-          project: uploadProjectEn.trim(), // Grouping Key (EN)
+          project: uploadProjectEn.trim(),
           projectTitles: {
             en: uploadProjectEn.trim(),
             cn: uploadProjectCn.trim(),
@@ -1108,9 +1182,6 @@ const PhotosManager = ({
           optimizedFile || file,
           `photos/${year}/${project}/${ts}_${idx}`
         );
-
-        // Inherit existing project titles if possible (simplified: just use group key)
-        // For better DX, we might need to fetch existing titles, but for "add to existing", keeping simple is safer.
         return onAddPhoto({
           title: file.name.split(".")[0],
           year,
@@ -1142,16 +1213,39 @@ const PhotosManager = ({
     }
   };
 
-  const handleRenameProject = async (oldName, year) => {
-    const newName = prompt("Rename to:", oldName);
-    if (newName && newName !== oldName) {
-      const toUpdate = photos.filter(
-        (p) =>
-          (p.year === year || (!p.year && year === "Unsorted")) &&
-          p.project === oldName
-      );
-      onBatchUpdate(toUpdate.map((p) => ({ id: p.id, project: newName })));
-    }
+  // Open Modal for Editing
+  const openEditProject = (project, year) => {
+    const projectPhotos = photos.filter(
+      (p) => p.year === year && p.project === project
+    );
+    const firstPhoto = projectPhotos[0];
+    const titles = firstPhoto?.projectTitles || { en: project, cn: "", th: "" };
+    setEditingProjectData({
+      oldYear: year,
+      oldProject: project,
+      en: titles.en || project,
+      cn: titles.cn || "",
+      th: titles.th || "",
+    });
+  };
+
+  const handleSaveProjectEdit = async (newData) => {
+    if (!editingProjectData) return;
+    setUploading(true);
+    const { oldYear, oldProject } = editingProjectData;
+    const toUpdate = photos.filter(
+      (p) => p.year === oldYear && p.project === oldProject
+    );
+
+    const updates = toUpdate.map((p) => ({
+      id: p.id,
+      project: newData.en, // Update Project ID/Key
+      projectTitles: newData,
+    }));
+
+    await onBatchUpdate(updates);
+    setUploading(false);
+    setEditingProjectData(null);
   };
 
   const moveProject = (year, proj, dir) => {
@@ -1207,6 +1301,7 @@ const PhotosManager = ({
 
   return (
     <div className="space-y-12">
+      {/* Upload Area */}
       <div className="bg-neutral-900 border border-neutral-800 p-6 rounded-xl sticky top-0 z-20 shadow-xl">
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
           <div className="md:col-span-1">
@@ -1262,6 +1357,7 @@ const PhotosManager = ({
         </button>
       </div>
 
+      {/* Projects List */}
       <div className="space-y-8 pb-24">
         <div className="flex justify-end">
           <button
@@ -1287,7 +1383,7 @@ const PhotosManager = ({
                     <div className="flex items-center gap-2">
                       <span className="text-white font-bold">{proj}</span>
                       <button
-                        onClick={() => handleRenameProject(proj, year)}
+                        onClick={() => openEditProject(proj, year)}
                         className="text-neutral-500 hover:text-white"
                       >
                         <Edit size={14} />
@@ -1358,6 +1454,14 @@ const PhotosManager = ({
             </div>
           ))}
       </div>
+
+      {/* Project Edit Modal */}
+      <ProjectEditModal
+        isOpen={!!editingProjectData}
+        onClose={() => setEditingProjectData(null)}
+        initialData={editingProjectData}
+        onSave={handleSaveProjectEdit}
+      />
     </div>
   );
 };
@@ -2314,7 +2418,14 @@ const AppContent = () => {
       getPublicCollection("photos"),
       (snap) => {
         const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        data.sort((a, b) => (a.order || 9999) - (b.order || 9999));
+
+        // [Critical Fix] 统一排序逻辑，确保前端与后台一致
+        data.sort((a, b) => {
+          const orderA = typeof a.order === "number" ? a.order : 9999;
+          const orderB = typeof b.order === "number" ? b.order : 9999;
+          return orderA - orderB;
+        });
+
         setPhotos(data);
         setIsLoading(false);
       },
