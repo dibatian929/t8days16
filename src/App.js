@@ -935,12 +935,8 @@ const WorksPage = ({ photos, profile, ui, onImageClick }) => {
   const getSortedProjects = (year) => {
     const projs = Object.keys(groupedByYearAndProject[year]);
     return projs.sort((a, b) => {
-      const minA = Math.min(
-        ...groupedByYearAndProject[year][a].map((p) => p.order || 0)
-      );
-      const minB = Math.min(
-        ...groupedByYearAndProject[year][b].map((p) => p.order || 0)
-      );
+      const minA = Math.min(...grouped[year][a].map((p) => p.order || 0));
+      const minB = Math.min(...grouped[year][b].map((p) => p.order || 0));
       return minA - minB;
     });
   };
@@ -954,7 +950,7 @@ const WorksPage = ({ photos, profile, ui, onImageClick }) => {
             className="mb-16 md:mb-12 flex flex-col md:flex-row gap-4 md:gap-8"
           >
             {/* 修复：移除手机端的 sticky，保留 md (电脑端) 的 sticky */}
-            <div className="md:w-48 flex-shrink-0 md:sticky md:top-32 h-fit pointer-events-none z-10">
+            <div className="md:w-48 flex-shrink-0 relative md:sticky md:top-32 h-fit pointer-events-none z-10">
               <span className="text-4xl md:text-2xl font-serif font-thin text-white/30 md:text-white/50 tracking-widest block leading-none md:-ml-2 transition-all font-serif">
                 {year}
               </span>
@@ -2271,14 +2267,7 @@ const AppContent = () => {
       getPublicCollection("photos"),
       (snap) => {
         const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-
-        // [Critical Fix] 统一排序逻辑，确保前端与后台一致
-        data.sort((a, b) => {
-          const orderA = typeof a.order === "number" ? a.order : 9999;
-          const orderB = typeof b.order === "number" ? b.order : 9999;
-          return orderA - orderB;
-        });
-
+        data.sort((a, b) => (a.order || 9999) - (b.order || 9999));
         setPhotos(data);
         setIsLoading(false);
       },
