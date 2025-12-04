@@ -617,18 +617,20 @@ const AboutPage = ({ profile, lang, onClose }) => {
   );
 };
 
-// ImmersiveLightbox: 优化版 (超细图标 + 手机端底部对齐 + 防卡顿)
+// ImmersiveLightbox: 优化版 (接收 lang 参数并显示多语言标题)
 const ImmersiveLightbox = ({
   initialIndex,
   images,
   onClose,
   onIndexChange,
+  lang,
 }) => {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [isHighResLoaded, setIsHighResLoaded] = useState(false);
   const highResRef = useRef(null);
   const currentImage = images[currentIndex];
 
+  // 手势状态
   const [touchStart, setTouchStart] = useState(null);
   const [touchEnd, setTouchEnd] = useState(null);
   const minSwipeDistance = 50;
@@ -690,7 +692,6 @@ const ImmersiveLightbox = ({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [currentIndex]);
 
-  // 点击背景关闭
   const handleBackgroundClick = (e) => {
     if (e.target === e.currentTarget) {
       onClose();
@@ -703,14 +704,18 @@ const ImmersiveLightbox = ({
   const imgClassName = isHighRes ? "h-[75vh] w-auto" : "max-h-[75vh] w-auto";
   const placeholderSrc = currentImage.thumbnailUrl || currentImage.url;
 
+  // Multi-language Title Resolution
+  const displayTitle =
+    currentImage.projectTitles?.[lang] || currentImage.project;
+
   return (
     <div
       className="fixed inset-0 z-[100] bg-black flex items-center justify-center animate-fade-in"
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
-      onClick={handleBackgroundClick} // 背景点击关闭
-      style={{ touchAction: "none" }} // 禁止浏览器滚动，优化手机体验
+      onClick={handleBackgroundClick}
+      style={{ touchAction: "none" }}
     >
       <button
         onClick={onClose}
@@ -719,7 +724,6 @@ const ImmersiveLightbox = ({
         <X className="w-6 h-6" />
       </button>
 
-      {/* PC 端：超细半透明箭头 */}
       <div className="hidden md:flex absolute inset-y-0 left-4 z-20 items-center justify-center pointer-events-none">
         <ChevronLeft
           className="text-white/50 hover:text-white transition-colors"
@@ -736,7 +740,6 @@ const ImmersiveLightbox = ({
         />
       </div>
 
-      {/* Interactive Click Zones */}
       <div
         className="absolute inset-y-0 left-0 w-1/2 z-10 cursor-pointer"
         onClick={(e) => {
@@ -770,14 +773,12 @@ const ImmersiveLightbox = ({
         />
       </div>
 
-      {/* 底部信息栏 */}
       <div className="absolute bottom-8 left-8 right-8 z-30 pointer-events-none flex justify-between items-end">
         <div className="text-white/40 font-serif font-thin text-xs tracking-widest">
-          {currentImage.year} — {currentImage.project}
+          {currentImage.year} — {displayTitle}
         </div>
 
         <div className="flex items-center gap-4 pointer-events-auto">
-          {/* 手机端翻页按钮 */}
           <div className="md:hidden flex items-center gap-4">
             <button
               onClick={(e) => {
@@ -917,7 +918,7 @@ const ProjectRow = ({ projectTitle, photos, onImageClick }) => {
   );
 };
 
-const WorksPage = ({ photos, profile, ui, onImageClick }) => {
+const WorksPage = ({ photos, profile, ui, onImageClick, lang }) => {
   const groupedByYearAndProject = photos.reduce((acc, photo) => {
     const year = photo.year ? String(photo.year).trim() : "Unsorted";
     const project = photo.project
@@ -935,8 +936,12 @@ const WorksPage = ({ photos, profile, ui, onImageClick }) => {
   const getSortedProjects = (year) => {
     const projs = Object.keys(groupedByYearAndProject[year]);
     return projs.sort((a, b) => {
-      const minA = Math.min(...grouped[year][a].map((p) => p.order || 0));
-      const minB = Math.min(...grouped[year][b].map((p) => p.order || 0));
+      const minA = Math.min(
+        ...groupedByYearAndProject[year][a].map((p) => p.order || 0)
+      );
+      const minB = Math.min(
+        ...groupedByYearAndProject[year][b].map((p) => p.order || 0)
+      );
       return minA - minB;
     });
   };
@@ -949,21 +954,25 @@ const WorksPage = ({ photos, profile, ui, onImageClick }) => {
             key={year}
             className="mb-16 md:mb-12 flex flex-col md:flex-row gap-4 md:gap-8"
           >
-            {/* 修复：移除手机端的 sticky，保留 md (电脑端) 的 sticky */}
             <div className="md:w-48 flex-shrink-0 relative md:sticky md:top-32 h-fit pointer-events-none z-10">
               <span className="text-4xl md:text-2xl font-serif font-thin text-white/30 md:text-white/50 tracking-widest block leading-none md:-ml-2 transition-all font-serif">
                 {year}
               </span>
             </div>
             <div className="flex-grow flex flex-col gap-8 overflow-hidden mt-4 md:mt-0">
-              {getSortedProjects(year).map((projectTitle) => {
+              {getSortedProjects(year).map((projectKey) => {
+                // 核心逻辑：找到该项目组的第一个图片，读取其 projectTitles
                 const projectPhotos = groupedByYearAndProject[year][
-                  projectTitle
+                  projectKey
                 ].sort((a, b) => (a.order || 0) - (b.order || 0));
+                const firstPhoto = projectPhotos[0];
+                const displayTitle =
+                  firstPhoto.projectTitles?.[lang] || projectKey; // 默认显示英文(key)
+
                 return (
                   <ProjectRow
-                    key={projectTitle}
-                    projectTitle={projectTitle}
+                    key={projectKey}
+                    projectTitle={displayTitle}
                     photos={projectPhotos}
                     onImageClick={onImageClick}
                   />
@@ -1000,9 +1009,13 @@ const PhotosManager = ({
   const [uploadYear, setUploadYear] = useState(
     new Date().getFullYear().toString()
   );
-  const [uploadProject, setUploadProject] = useState("");
+
+  // State for Multi-language Project Names
+  const [uploadProjectEn, setUploadProjectEn] = useState("");
+  const [uploadProjectCn, setUploadProjectCn] = useState("");
+  const [uploadProjectTh, setUploadProjectTh] = useState("");
+
   const [localPhotos, setLocalPhotos] = useState(photos);
-  const [dragged, setDragged] = useState(null);
 
   useEffect(() => {
     setLocalPhotos(photos);
@@ -1028,7 +1041,8 @@ const PhotosManager = ({
 
   const handleBatchUpload = async () => {
     if (files.length === 0) return;
-    if (!uploadProject.trim()) return alert("Please enter a Project Name.");
+    if (!uploadProjectEn.trim())
+      return alert("Please enter Project Name (EN) as main ID.");
     setUploading(true);
     try {
       const promises = Array.from(files).map(async (file, idx) => {
@@ -1038,19 +1052,24 @@ const PhotosManager = ({
         if (thumbFile)
           thumbUrl = await uploadFileToStorage(
             thumbFile,
-            `photos/${uploadYear}/${uploadProject.trim()}/${timestamp}_${idx}_thumb.jpg`
+            `photos/${uploadYear}/${uploadProjectEn.trim()}/${timestamp}_${idx}_thumb.jpg`
           );
 
         const optimizedFile = await compressImage(file, 1920, 0.85);
         const url = await uploadFileToStorage(
           optimizedFile || file,
-          `photos/${uploadYear}/${uploadProject.trim()}/${timestamp}_${idx}`
+          `photos/${uploadYear}/${uploadProjectEn.trim()}/${timestamp}_${idx}`
         );
 
         return onAddPhoto({
           title: file.name.split(".")[0],
           year: uploadYear.trim(),
-          project: uploadProject.trim(),
+          project: uploadProjectEn.trim(), // Grouping Key (EN)
+          projectTitles: {
+            en: uploadProjectEn.trim(),
+            cn: uploadProjectCn.trim(),
+            th: uploadProjectTh.trim(),
+          },
           url,
           thumbnailUrl: thumbUrl,
           order: 9999,
@@ -1059,6 +1078,9 @@ const PhotosManager = ({
       });
       await Promise.all(promises);
       setFiles([]);
+      setUploadProjectEn("");
+      setUploadProjectCn("");
+      setUploadProjectTh("");
       alert("Uploaded!");
     } catch (e) {
       alert(e.message);
@@ -1086,6 +1108,9 @@ const PhotosManager = ({
           optimizedFile || file,
           `photos/${year}/${project}/${ts}_${idx}`
         );
+
+        // Inherit existing project titles if possible (simplified: just use group key)
+        // For better DX, we might need to fetch existing titles, but for "add to existing", keeping simple is safer.
         return onAddPhoto({
           title: file.name.split(".")[0],
           year,
@@ -1183,20 +1208,40 @@ const PhotosManager = ({
   return (
     <div className="space-y-12">
       <div className="bg-neutral-900 border border-neutral-800 p-6 rounded-xl sticky top-0 z-20 shadow-xl">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <input
-            className="bg-black border border-neutral-700 p-2 text-white rounded"
-            value={uploadYear}
-            onChange={(e) => setUploadYear(e.target.value)}
-            placeholder="Year"
-          />
-          <input
-            className="bg-black border border-neutral-700 p-2 text-white rounded"
-            value={uploadProject}
-            onChange={(e) => setUploadProject(e.target.value)}
-            placeholder="Project Name"
-          />
-          <div className="relative border border-dashed border-neutral-600 bg-black rounded flex items-center justify-center cursor-pointer hover:border-white">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
+          <div className="md:col-span-1">
+            <input
+              className="w-full bg-black border border-neutral-700 p-2 text-white rounded text-sm"
+              value={uploadYear}
+              onChange={(e) => setUploadYear(e.target.value)}
+              placeholder="Year"
+            />
+          </div>
+          <div className="md:col-span-1">
+            <input
+              className="w-full bg-black border border-neutral-700 p-2 text-white rounded text-sm"
+              value={uploadProjectEn}
+              onChange={(e) => setUploadProjectEn(e.target.value)}
+              placeholder="Project Name (EN)"
+            />
+          </div>
+          <div className="md:col-span-1">
+            <input
+              className="w-full bg-black border border-neutral-700 p-2 text-white rounded text-sm"
+              value={uploadProjectCn}
+              onChange={(e) => setUploadProjectCn(e.target.value)}
+              placeholder="项目名称 (CN)"
+            />
+          </div>
+          <div className="md:col-span-1">
+            <input
+              className="w-full bg-black border border-neutral-700 p-2 text-white rounded text-sm"
+              value={uploadProjectTh}
+              onChange={(e) => setUploadProjectTh(e.target.value)}
+              placeholder="ชื่อโครงการ (TH)"
+            />
+          </div>
+          <div className="md:col-span-1 relative border border-dashed border-neutral-600 bg-black rounded flex items-center justify-center cursor-pointer hover:border-white">
             <span className="text-xs text-neutral-400">
               {files.length ? `${files.length} files` : "Select Photos"}
             </span>
@@ -1211,9 +1256,9 @@ const PhotosManager = ({
         <button
           onClick={handleBatchUpload}
           disabled={uploading}
-          className="w-full mt-4 bg-white text-black font-bold py-2 rounded hover:bg-neutral-200"
+          className="w-full bg-white text-black font-bold py-3 rounded hover:bg-neutral-200"
         >
-          {uploading ? "Uploading..." : "Upload"}
+          {uploading ? "Uploading..." : "Create Project & Upload"}
         </button>
       </div>
 
@@ -2165,6 +2210,7 @@ const MainView = ({ photos, settings, onLoginClick, isOffline }) => {
           profile={profile}
           ui={ui}
           onImageClick={handleImageClick}
+          lang={lang}
         />
       )}
       {showAbout && (
@@ -2180,6 +2226,7 @@ const MainView = ({ photos, settings, onLoginClick, isOffline }) => {
           images={lightboxImages}
           onClose={handleLightboxClose}
           onIndexChange={handleLightboxIndexChange}
+          lang={lang}
         />
       )}
     </div>
